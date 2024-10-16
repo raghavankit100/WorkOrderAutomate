@@ -9,10 +9,17 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 import time
 import os
-import shutil
 import win32com.client
 
-     
+Special_char =[]
+Submission_notequal_noInGroup =[]
+Diff_BrokerCode = []
+Wog_case = []
+Pega_case = []
+Technical_issue = []
+
+tracker_Worflow_Email=[]
+
 def flow():
 
         def has_special_chars(data):
@@ -28,11 +35,8 @@ def flow():
             mail.Send()
 
         def updateExcel(row):
-
             for worksheet_row in worksheet.iter_rows(min_row=2): 
-        
-                if worksheet_row[3].value == row[3]:  # Assuming row[1] is the unique identifier
-                    # Update the corresponding cell in column 3 (index 2) to "Tracker+Workflow AQ"
+                if worksheet_row[3].value == row[3]:  
                     worksheet_row[2].value = "Tracker+Workflow AQ"  
 
         def PegaPush(row):
@@ -120,7 +124,7 @@ https://repository.xchanging.com/web/?desktop=ui&amp;feature=default&amp;wpr=BHC
 
                 driver.quit()
 
-
+            Pega_case.append(row[22])
             #update excel status to OK
             for worksheetrow in worksheet.iter_rows(min_row=1):
                 for cell in worksheetrow:
@@ -131,8 +135,6 @@ https://repository.xchanging.com/web/?desktop=ui&amp;feature=default&amp;wpr=BHC
         time.sleep(3)
         worksheet = worksbook.active
 
-        tracker_Worflow_Email=[]
-
         for row in worksheet.iter_rows(min_row=2, values_only=True):
             if row[2] =='Tracker+Workflow AQ+Email':
                 tracker_Worflow_Email.append(row)
@@ -140,7 +142,7 @@ https://repository.xchanging.com/web/?desktop=ui&amp;feature=default&amp;wpr=BHC
         missing_status_rows = []
 
         for row in worksheet.iter_rows(min_row=2, values_only=True):
-            if (row[2] == 'missing'):  #or (row[2] =='Tracker+Workflow AQ'))
+            if (row[2] == 'missing'):
                 missing_status_rows.append(row)
 
         # workOrderRef Index 
@@ -160,7 +162,7 @@ https://repository.xchanging.com/web/?desktop=ui&amp;feature=default&amp;wpr=BHC
 
         cur = connection.cursor()
 
-        workOrder_Status = []  #initails a list so it will store workorder status 
+        workOrder_Status = []  
 
         # Execute the SQL query and store the values
         for qw in cur.execute(sql_query):
@@ -261,6 +263,7 @@ https://repository.xchanging.com/web/?desktop=ui&amp;feature=default&amp;wpr=BHC
                         send_email(text_content,rendered_html,text_content2,recipient_email)
                         #to update the excel from missing to tracker+workflowAQ
                         updateExcel(row)
+                        Special_char.append(row[22])
                     
     # CASE 5   #Same thing we are doing in case1 If his case exist so it have check before case1
     # I think this case is not exist anymore
@@ -382,6 +385,7 @@ https://repository.xchanging.com/web/?desktop=ui&amp;feature=default&amp;wpr=BHC
                                         rendered_html = template.render(client_rows=client_rows,noInGroup=noInGroup)
 
                                         send_email(text_content,rendered_html,text_content2,recipient_email)
+                                        Submission_notequal_noInGroup.append(row[22])
 
                                 #Case3
                                 elif different_value is not None:
@@ -466,11 +470,24 @@ https://repository.xchanging.com/web/?desktop=ui&amp;feature=default&amp;wpr=BHC
                                     rendered_html = template.render(client_rows=client_rows,noInGroup=noInGroup,reference_value=reference_value, different_value=different_value)
 
                                     send_email(text_content,rendered_html,text_content2,recipient_email)
+                                    Diff_BrokerCode.append(row[22])
 
                                 else:#(wog case)
-                                    pass
+                                    wog_query= f"SELECT * FROM repository.tblworkordergroup WHERE wog_Group_Reference = '{row[3]}'"
 
+                                    wog_table=[]
+                                    for wog_row in cur.execute(wog_query):
+                                        wog_table.append(wog_row) 
 
+                                    for wog_row1 in wog_table:
+
+                                        if(wog_row1[4] != wog_row1[5]):
+                                            print(f"WOG CASE: Run the update query for ${row[3]} group reference")
+                                            Wog_case.append(row[22])
+                                        elif(wog_row1[6]=='c'):
+                                            print("Wog CASE: Wog_Noification is not complete do further investigation")
+                                            Wog_case.append(row[22])
+                                        
                                 #to update the excel from missing to tracker+workflowAQ
                                 updateExcel(row)
 
@@ -606,10 +623,12 @@ https://repository.xchanging.com/web/?desktop=ui&amp;feature=default&amp;wpr=BHC
                 rendered_html = template.render(client_rows=client_rows)
 
                 send_email(text_content,rendered_html,text_content2,recipient_email)
-
+                time.sleep(2)
                 #to update the excel from missing to tracker+workflowAQ
-                updateExcel(row)   
-
+                updateExcel(row)  
+                time.sleep(2)
+                Technical_issue.append(not_shown_package_row[22])
+                
             for push_work_package_row in PushWorkpackages:
                 PegaPush(push_work_package_row)
                 #TrackerPush(push_work_package_row)
@@ -666,8 +685,6 @@ for message in messages:
     except Exception as e:
         print(f"Error processing message: {e}")
 
-
-#I used save and source folder two different variable but they have same value
 source_folder = r"C:\Users\araghav6\OneDrive - DXC Production\Desktop\workorderfile" 
 destination_folder = r"C:\Users\araghav6\Downloads\workorder"  
 
@@ -686,7 +703,11 @@ while True:
 
 
 
-
-
-
+print(f'special char: {Special_char} \n,
+Submission notequal: {Submission_notequal_noInGroup} \n,
+diffbrokercode: {Diff_BrokerCode} \n,
+wogcase: {Wog_case} \n,
+pega case: {Pega_case} \n,
+technical issue: {Technical_issue} \n,
+trackerworkflow tocancel: {tracker_Worflow_Email} \n')
 
